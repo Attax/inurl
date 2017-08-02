@@ -126,13 +126,13 @@ app.get('/addurl/', (req, res) => {
                     var InsertSQL = 'INSERT INTO `surl` (target) VALUES ("' + queryURL + '")';
 
                     conn.query(InsertSQL, (err, rows, fields) => {
-                        return new Promise(function(resolve,reject){
-                            if(err) {
-                                reject(err); 
-                            } else {
-                                resolve(rows);
-                            }
-                        })
+                       
+                        if(err) {
+                            return Promise.reject(err); 
+                        } else {
+                            return Promise.resolve(rows);
+                        }
+                        
                        
                     });
                 }
@@ -144,14 +144,12 @@ app.get('/addurl/', (req, res) => {
                 var uidSQL = 'SELECT LAST_INSERT_ID()';
 
                 conn.query(uidSQL, (err, rows, fields) => {
-                    return new Promise(function(resolve,reject){
-                        if(err){
-                            reject(err);
-                        }else{
-                            resolve(rows);
-                        }
-                    })
                    
+                    if(err){
+                        return Promise.reject(err);
+                    }else{
+                        return Promise.resolve(rows);
+                    }
                 });
 
             },function(err){
