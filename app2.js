@@ -38,42 +38,40 @@ app.get('/favicon.ico', (req, res) => {
 });
 
 
-// //短网址跳转
-// app.get(/^\/([A-Za-z0-9]{1,6})$/, (req, res) => {
-//     var _surl = req.params[0];
+//短网址跳转
+app.get(/^\/([A-Za-z0-9]{1,6})$/, (req, res) => {
+    var _surl = req.params[0];
 
-//     if (_surl !== 'favicon.ico') {
+    if (_surl !== 'favicon.ico') {
 
-//         //连接mysql
-//         var conn = mysql.createConnection(mysqlOpt);
+        //连接mysql
+        var conn = mysql.createConnection(mysqlOpt);
 
-//         var surlId = surl.URLToId(_surl);
+        var surlId = surl.URLToId(_surl);
 
-//         //console.log('surlId', surlId);
+        //console.log('surlId', surlId);
 
-//         var SQL = 'SELECT target FROM `surl` WHERE uid=' + surlId;
-//         //执行查询
-//         conn.query(SQL, (err, rows, fields) => {
-//             if (err) {
-//                 console.log('mysql error:', err);
-//             } else {
-//                 if (rows.length) {
-//                     var target = rows[0].target;
-//                     //重定向到相应链接
-//                     res.redirect(301, target);
-//                     res.end();
-//                 }else{
+        var SQL = 'SELECT target FROM `surl` WHERE uid=' + surlId;
+        //执行查询
+        conn.query(SQL, (err, rows, fields) => {
+            if (err) {
+                console.log('mysql error:', err);
+            } else {
+                if (rows.length) {
+                    var target = rows[0].target;
+                    //重定向到相应链接
+                    res.redirect(301, target);
+                    res.end();
+                }
+            };
 
-//                 }
-//             };
+            //释放mysql连接
+            conn.end();
+        });
 
-//             //释放mysql连接
-//             conn.end();
-//         });
+    }
 
-//     }
-
-// });
+});
 
 
 
@@ -108,8 +106,7 @@ app.get('/addurl/', (req, res) => {
        promise.then(function(rows){
                 //如果数据库中已经存在相应的连接
                 if (rows.length) {
-                    console.log('here')
-                    var uid =rows[0].uid;
+                    var uid = rows[0].uid;
 
                     //返回的数据
                     result.code = 200;
@@ -124,21 +121,18 @@ app.get('/addurl/', (req, res) => {
                         res.json(result);
                         res.end();
                     }
-                    
-                   
                 } else {
-                    
                      //插入到数据库中
                     var InsertSQL = 'INSERT INTO `surl` (target) VALUES ("' + queryURL + '")';
 
                     conn.query(InsertSQL, (err, rows, fields) => {
-                       
-                        if(err) {
-                            return Promise.reject(err); 
-                        } else {
-                            return Promise.resolve(rows);
-                        }
-                        
+                        return new Promise(function(resolve,reject){
+                            if(err) {
+                                reject(err); 
+                            } else {
+                                resolve(rows);
+                            }
+                        })
                        
                     });
                 }
@@ -150,12 +144,14 @@ app.get('/addurl/', (req, res) => {
                 var uidSQL = 'SELECT LAST_INSERT_ID()';
 
                 conn.query(uidSQL, (err, rows, fields) => {
+                    return new Promise(function(resolve,reject){
+                        if(err){
+                            reject(err);
+                        }else{
+                            resolve(rows);
+                        }
+                    })
                    
-                    if(err){
-                        return Promise.reject(err);
-                    }else{
-                        return Promise.resolve(rows);
-                    }
                 });
 
             },function(err){
@@ -163,7 +159,7 @@ app.get('/addurl/', (req, res) => {
                 res.end();
             }).then(function(rows){
                 if (rows.length) {
-                    var uid =rows[0]['LAST_INSERT_ID()'];
+                    var uid = rows[0]['LAST_INSERT_ID()'];
 
                     //返回的数据
                     result.code = 200;
@@ -181,7 +177,7 @@ app.get('/addurl/', (req, res) => {
                     console.log('没获取到数据库里uid');
                 }
             },function(err){
-                console.log('mysql error:',err);
+                console.log('mysql error:', err);
                 res.end();
             });
 
