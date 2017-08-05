@@ -95,27 +95,25 @@ app.get(/^\/([A-Za-z0-9]{1,6})$/, (req, res) => {
                 console.log(err)
             })
             .then(function(surlId) {
-                var SQL = 'SELECT target FROM `surl` WHERE uid=' + surlId;
 
-                //执行查询
-                conn.query(SQL, function(err, rows, fields) {
-                    if (err) {
-                        return Promise.reject(err);
-                        //释放mysql连接
-                        conn.end();
-                    } else {
-                        console.log('enter', rows)
+                return new Promise(function(resolve, reject) {
+                    var SQL = 'SELECT target FROM `surl` WHERE uid=' + surlId;
+                    //执行查询
+                    conn.query(SQL, function(err, rows, fields) {
+                        if (err) {
+                            return reject(err);
 
-                        return Promise.resolve(rows);
-                        //释放mysql连接
-                        conn.end();
-                    };
+                        } else {
+                            console.log('enter', rows)
+
+                            return resolve(rows);
+                        };
+                    });
+
                 });
 
             }, function(err) {
                 console.log(err)
-            }).catch(function(err) {
-                console.log('catch', err)
             })
             .then(function(rows) {
                 console.log('testing:', rows)
