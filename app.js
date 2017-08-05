@@ -51,6 +51,8 @@ app.get(/^\/([A-Za-z0-9]{1,6})$/, (req, res) => {
     if (_surl !== 'favicon.ico') {
         //解码url，获取id
         var surlId = surl.URLToId(_surl);
+
+
         //连接mysql
         var conn = mysql.createConnection(mysqlOpt);
         /**
@@ -81,35 +83,43 @@ app.get(/^\/([A-Za-z0-9]{1,6})$/, (req, res) => {
                  */
                 else if (result == 'nil') {
                     res.end('404');
+                    return Promise.reject();
                 } else {
                     //有返回值，直接重定向到target页面
                     res.redirect(301, target);
                     res.end();
+                    return Promise.reject();
                 }
 
             }, function(err) {
                 console.log(err)
             })
             .then(function(surlId) {
-
                 var SQL = 'SELECT target FROM `surl` WHERE uid=' + surlId;
 
                 //执行查询
                 conn.query(SQL, function(err, rows, fields) {
                     if (err) {
                         return Promise.reject(err);
+                        //释放mysql连接
+                        conn.end();
                     } else {
+                        console.log('enter', rows)
+
                         return Promise.resolve(rows);
+                        //释放mysql连接
+                        conn.end();
                     };
-                    //释放mysql连接
-                    conn.end();
                 });
 
             }, function(err) {
-
+                console.log(err)
+            }).catch(function(err) {
+                console.log('catch', err)
             })
             .then(function(rows) {
-                //如果mysql中存在相关数据
+                console.log('testing:', rows)
+                    //如果mysql中存在相关数据
                 if (rows.length) {
                     var target = rows[0].target;
                     //重定向到相应链接
@@ -127,13 +137,14 @@ app.get(/^\/([A-Za-z0-9]{1,6})$/, (req, res) => {
                     res.end('404');
                 }
             }, function(err) {
-
-            }).then(function(val) {
+                console.log('debug', err)
+            })
+            .then(function(val) {
                 console.log(val)
             }, function(err) {
-
-            }).catch(function() {
-
+                console.log(err)
+            }).catch(function(err) {
+                console.log(err)
             });
 
 
