@@ -30,7 +30,7 @@ app.use(express.static(path.join(__dirname, 'public')));
 const mysqlOpt = {
     host: 'localhost',
     user: 'root',
-    password: '123456',
+    password: '12345678',
     database: 'surl'
 };
 
@@ -67,59 +67,46 @@ app.get(/^\/([A-Za-z0-9]{1,6})$/, (req, res) => {
          */
 
         //ioreis支持promise
-        redis.hget('surl', surlId)
-            .then(function(result) {
-                /**
-                 *  Redis中字段为surl的hash中surlId字段的值
-                 */
 
-                if (result == null) {
-                    //如果没有查询到，
-                    return Promise.resolve(surlId);
-                }
-                /**
-                 * *如果返回了nil,说明此前查询过Redis和MySQL,均不存在该surlId字段，
-                 * 且设置该字段在Redis中为nil,则本次直接返回404
-                 */
-                else if (result == 'nil') {
-                    res.end('404');
-                    return Promise.reject();
-                } else {
-                    //有返回值，直接重定向到target页面
-                    res.redirect(301, target);
-                    res.end();
-                    return Promise.reject();
-                }
+        function queryURLRedisRecord(){
+        	return redis.hget('surl', surlId);
+        }
 
-            }, function(err) {
-                console.log(err)
-            })
-            .then(function(surlId) {
+        //查询DB中url的记录
+        function queryURLDBRecord(){
+        	var SQL = 'SELECT target FROM `surl` WHERE uid=' + surlId;
+        	return new Promise(function(resolve, reject) {
+	            //执行查询
+	            conn.query(SQL, function(err, rows, fields) {
+	                if (err) {
+	                    console.log(err)
+                        reject(err); 
+	                } else {
+	                    console.log('enter', rows)
+	                    return resolve(rows);
+	                };
+	            });
 
-                return new Promise(function(resolve, reject) {
-                    var SQL = 'SELECT target FROM `surl` WHERE uid=' + surlId;
-                    //执行查询
-                    conn.query(SQL, function(err, rows, fields) {
-                        if (err) {
-                            return reject(err);
+	        });
+        }
+        
 
-                        } else {
-                            console.log('enter', rows)
+        function writeUnexistURLRedisRecord(){
+        	return  redis.hset('surl', surlId, 'nil');    
+        }
 
-                            return resolve(rows);
-                        };
-                    });
+       
 
-                });
 
-            }, function(err) {
-                console.log(err)
-            })
-            .then(function(rows) {
-                console.log('testing:', rows)
-                    //如果mysql中存在相关数据
-                if (rows.length) {
-                    var target = rows[0].target;
+        (async function(){
+        	var _redisResult=await queryURLRedisRecord();
+        	//redis中没有记录
+        	if(_redisResult==null){
+
+        		var _dbResult=await queryURLDBRecord();
+
+        		if (_dbResult.length) {
+                    var target = _dbResult[0].target;
                     //重定向到相应链接
                     res.redirect(301, target);
                     res.end();
@@ -134,16 +121,102 @@ app.get(/^\/([A-Za-z0-9]{1,6})$/, (req, res) => {
 
                     res.end('404');
                 }
-            }, function(err) {
-                console.log('debug', err)
-            })
-            .then(function(val) {
-                console.log(val)
-            }, function(err) {
-                console.log(err)
-            }).catch(function(err) {
-                console.log(err)
-            });
+
+
+        	}
+        	/**
+             * 如果返回了nil,说明此前查询过Redis和MySQL,均不存在该surlId字段，
+             * 且设置该字段在Redis中为nil,则本次直接返回404
+             */   
+        	else if(_redisResult=='nil'){
+        		 res.end('404');
+    		}else{
+    			//redis中有记录，直接重定向到target页面
+		        res.redirect(301, target);
+		        res.end();
+    		}
+        	console.log(_reidsResult)
+        	console.log('redis output')
+        }());
+
+
+        // redis.hget('surl', surlId)
+        //     .then(function(result) {
+        //         /**
+        //          *  Redis中字段为surl的hash中surlId字段的值
+        //          */
+
+        //         if (result == null) {
+        //             //如果没有查询到，
+        //             return Promise.resolve(surlId);
+        //         }
+        //         /**
+        //          * *如果返回了nil,说明此前查询过Redis和MySQL,均不存在该surlId字段，
+        //          * 且设置该字段在Redis中为nil,则本次直接返回404
+        //          */
+        //         else if (result == 'nil') {
+        //             res.end('404');
+        //             return Promise.reject();
+        //         } else {
+        //             //有返回值，直接重定向到target页面
+        //             res.redirect(301, target);
+        //             res.end();
+        //             return Promise.reject();
+        //         }
+
+        //     }, function(err) {
+        //         console.log(err)
+        //     })
+        //     .then(function(surlId) {
+
+        //         return new Promise(function(resolve, reject) {
+        //             var SQL = 'SELECT target FROM `surl` WHERE uid=' + surlId;
+        //             //执行查询
+        //             conn.query(SQL, function(err, rows, fields) {
+        //                 if (err) {
+        //                     return reject(err);
+
+        //                 } else {
+        //                     console.log('enter', rows)
+
+        //                     return resolve(rows);
+        //                 };
+        //             });
+
+        //         });
+
+        //     }, function(err) {
+        //         console.log(err)
+        //     })
+        //     .then(function(rows) {
+        //         console.log('testing:', rows)
+        //             //如果mysql中存在相关数据
+        //         if (rows.length) {
+        //             var target = rows[0].target;
+        //             //重定向到相应链接
+        //             res.redirect(301, target);
+        //             res.end();
+        //         } else {
+        //             //写入Redis缓存，设置默认值nil
+        //             redis.hset('surl', surlId, 'nil')
+        //                 .then(function(result) {
+        //                     return Promise.resolve('设置Redis surl ' + surlId + '字段值为默认值nil成功');
+        //                 }, function(err) {
+        //                     return Promise.resolve({ 'msg': '设置Redis surl ' + surId + '字段值为默认值nil失败', 'Error': err });
+        //                 });
+
+        //             res.end('404');
+        //         }
+        //     }, function(err) {
+        //         console.log('debug', err)
+        //     })
+        //     .then(function(val) {
+        //         console.log(val)
+        //     }, function(err) {
+        //         console.log(err)
+        //     }).catch(function(err) {
+        //         console.log(err)
+        //     });
 
 
     }
@@ -153,6 +226,7 @@ app.get(/^\/([A-Za-z0-9]{1,6})$/, (req, res) => {
 
 
 app.get('/addurl/', (req, res) => {
+
     var jsonpName = req.query.callback;
     var queryURL = req.query.url;
 
@@ -161,6 +235,7 @@ app.get('/addurl/', (req, res) => {
 
     var localSiteUrlReg = /^((http|https):\/\/)?localhost\/\w*/
     var urlReg = /(http | ftp | https)/;
+    console.log(queryURL)
     //如果添加的链接存在
     if (queryURL != undefined && queryURL != '') {
 
@@ -168,80 +243,50 @@ app.get('/addurl/', (req, res) => {
         var conn = mysql.createConnection(mysqlOpt);
 
         var SQL = 'SELECT uid FROM `surl` WHERE target ="' + queryURL + '"';
-        //console.log('unde', queryURL)
 
-        var promise = new Promise(function(resolve, reject) {
-            conn.query(SQL, (err, rows, fields) => {
-                if (err) {
-                    reject(err);
-                } else {
-                    resolve(rows);
-                }
-            });
-        });
-        //查库，确认是否已经存在相应链接
-        promise.then(function(rowsVal) {
-            //如果数据库中已经存在相应的连接
-            if (rowsVal.length) {
-                var uid = rowsVal[0].uid;
-
-                //返回的数据
-                result.code = 200;
-                result.url = queryURL;
-                result.surl = surl.idToURL(uid);
-
-                //如果是jsonp
-                if (jsonpName != undefined) {
-                    res.end(jsonpName + '(' + JSON.stringify(result) + ')');
-                } else {
-
-                    res.json(result);
-                    res.end();
-                }
-
-                return Promise.reject('跳出promise');
-
-            } else {
-
-                //插入到数据库中
-                var InsertSQL = 'INSERT INTO `surl` (target) VALUES ("' + queryURL + '")';
-
-                conn.query(InsertSQL, (err, rows, fields) => {
-
+        //查询db中是否存在url的记录
+        var queryURLRecord=function(){
+            
+            //console.log('unde', queryURL)
+            return new Promise(function(resolve,reject){
+                conn.query(SQL, (err, rows, fields) => {
                     if (err) {
-                        return Promise.reject(err);
+                        console.log(err)
+                        reject(err); 
                     } else {
-
-                        return Promise.resolve(rows);
+                        resolve(rows);
                     }
-
-
+                    
                 });
-            }
-        }, function(err) {
-            console.log('错误处理:', err);
-            res.end();
-        }).then(function(rowsVal) {
+           }) 
+        };
 
-            //获取自增id
-            var uidSQL = 'SELECT LAST_INSERT_ID()';
+        //插入到数据库中
+        var InsertSQL = 'INSERT INTO `surl` (target) VALUES ("' + queryURL + '")';
 
-            conn.query(uidSQL, (err, rows, fields) => {
+        var insertURLRecord=function(){
 
-                if (err) {
-                    return Promise.reject(err);
-                } else {
-                    return Promise.resolve(rows);
-                }
+            return new Promise(function(resolve,reject){
+                conn.query(InsertSQL, (err, rows, fields) => {
+                    if(err) {
+                        console.log(err)
+                        reject(err); 
+                    } else {
+                        resolve(rows);
+                    }
+                });
+               
             });
+        };
+       
 
-        }, function(err) {
-            console.log('错误处理:', err);
-            res.end();
-        }).then(function(rowsVal) {
-
-            if (rowsVal.length) {
-                var uid = rowsVal[0]['LAST_INSERT_ID()'];
+        //async执行
+        (async function(){
+            //db中的url记录
+            var urlRows=await queryURLRecord();
+            
+            if(urlRows.length){
+                var uid=urlRows[0].uid;
 
                 //返回的数据
                 result.code = 200;
@@ -252,21 +297,28 @@ app.get('/addurl/', (req, res) => {
                 if (jsonpName != undefined) {
                     res.end(jsonpName + '(' + JSON.stringify(result) + ')');
                 } else {
+
                     res.json(result);
-                    res.end();
                 }
-            } else {
-                console.log('没获取到数据库里uid');
+            }else{
+               var _insertResult=await insertURLRecord();
+
+                //返回的数据
+                result.code = 200;
+                result.url = queryURL;
+                result.surl = surl.idToURL(_insertResult.insertId);
+
+                console.log(result.surl)
+
+                //如果是jsonp
+                if (jsonpName != undefined) {
+                    res.end(jsonpName + '(' + JSON.stringify(result) + ')');
+                } else {
+                    res.json(result);
+                }
             }
 
-            return Promise.reject('跳出promise');
-
-        }, function(err) {
-            console.log('错误处理:', err);
-            res.end();
-        }).catch(function() {
-
-        });
+        })();
 
 
     } else {
@@ -281,7 +333,6 @@ app.get('/addurl/', (req, res) => {
 
 
 
-
 //404
 
 app.get('*', (req, res) => {
@@ -289,7 +340,7 @@ app.get('*', (req, res) => {
 });
 
 
-/*
+
 app.use((err, req, res, next) => {
 
     res.status(err.status || 500);
@@ -298,4 +349,3 @@ app.use((err, req, res, next) => {
         error: {}
     });
 });
-*/
